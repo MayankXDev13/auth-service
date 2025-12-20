@@ -52,11 +52,12 @@ export async function loginUser(email: string, password: string) {
   await db.insert(refreshTokens).values({
     userId: user.id,
     tokenHash: hashToken(refreshToken),
-    expiresAt: new Date(Date.now() * 7 * 24 * 60 * 60 * 1000),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
   return { user, accessToken, refreshToken };
 }
+
 
 export async function rotateRefreshToken(oldToken: string) {
   const payload = verifyRefreshToken(oldToken);

@@ -33,12 +33,14 @@ export async function login(req: Request, res: Response) {
     .status(200)
     .cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     })
     .cookie("accessToken", accessToken, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
+
       sameSite: "strict",
     })
     .json({
@@ -61,10 +63,17 @@ export async function refreshTokenHandler(req: Request, res: Response) {
     res
       .cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      })
+      .cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+
         sameSite: "strict",
       })
-      .json({ accessToken });
+      .json({ message: "token refreshed" });
   } catch (err) {
     res.sendStatus(401);
   }

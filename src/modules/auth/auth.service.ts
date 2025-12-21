@@ -22,12 +22,15 @@ export async function registerUser(
 
   const passwordHash = await hashPassword(password);
 
-  const [user] = await db.insert(users).values({
-    email,
-    password: passwordHash,
-    name,
-    provider: "local",
-  });
+  const [user] = await db
+    .insert(users)
+    .values({
+      email,
+      password: passwordHash,
+      name,
+      provider: "local",
+    })
+    .returning();
 
   return user;
 }
@@ -58,7 +61,6 @@ export async function loginUser(email: string, password: string) {
   return { user, accessToken, refreshToken };
 }
 
-
 export async function rotateRefreshToken(oldToken: string) {
   const payload = verifyRefreshToken(oldToken);
 
@@ -70,7 +72,6 @@ export async function rotateRefreshToken(oldToken: string) {
       eq(refreshTokens.revoked, false)
     ),
   });
-
   if (!storedToken) {
     await db
       .update(refreshTokens)
@@ -99,5 +100,3 @@ export async function rotateRefreshToken(oldToken: string) {
     refreshToken: newRefreshToken,
   };
 }
-
-

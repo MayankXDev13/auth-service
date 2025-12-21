@@ -1,7 +1,15 @@
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 
 const ACCESS_TOKEN_EXPIRES = "15m";
 const REFRESH_TOKEN_EXPIRES = "7d";
+
+export interface AccessTokenPayload extends JwtPayload {
+  userId: string;
+}
+
+export interface RefreshTokenPayload extends JwtPayload {
+  userId: string;
+}
 
 export function createAccessToken(userId: string) {
   return jwt.sign(
@@ -19,10 +27,9 @@ export function createRefreshToken(userId: string) {
   );
 }
 
-export function verifyRefreshToken(token: string) {
-  return jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as {
-    userId: string;
-    iat: number;
-    exp: number;
-  };
+export function verifyRefreshToken(token: string): RefreshTokenPayload {
+  return jwt.verify(
+    token,
+    process.env.JWT_REFRESH_SECRET!
+  ) as RefreshTokenPayload;
 }

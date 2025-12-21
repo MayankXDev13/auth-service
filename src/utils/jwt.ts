@@ -11,20 +11,16 @@ export interface RefreshTokenPayload extends JwtPayload {
   userId: string;
 }
 
-export function createAccessToken(userId: string) {
-  return jwt.sign(
-    { userId },
-    process.env.JWT_SECRET!,
-    { expiresIn: ACCESS_TOKEN_EXPIRES }
-  );
+export function createAccessToken(userId: string, role: "user" | "admin") {
+  return jwt.sign({ userId, role }, process.env.JWT_SECRET!, {
+    expiresIn: ACCESS_TOKEN_EXPIRES,
+  });
 }
 
 export function createRefreshToken(userId: string) {
-  return jwt.sign(
-    { userId },
-    process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: REFRESH_TOKEN_EXPIRES }
-  );
+  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET!, {
+    expiresIn: REFRESH_TOKEN_EXPIRES,
+  });
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload {

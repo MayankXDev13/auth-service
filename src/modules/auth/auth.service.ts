@@ -49,7 +49,7 @@ export async function loginUser(email: string, password: string) {
     throw new Error("Invalid credentials");
   }
 
-  const accessToken = createAccessToken(user.id);
+  const accessToken = createAccessToken(user.id, "user");
   const refreshToken = createRefreshToken(user.id);
 
   await db.insert(refreshTokens).values({
@@ -86,7 +86,7 @@ export async function rotateRefreshToken(oldToken: string) {
     .set({ revoked: true })
     .where(eq(refreshTokens.id, storedToken.id));
 
-  const newAccessToken = createAccessToken(payload.userId);
+  const newAccessToken = createAccessToken(payload.userId, "user");
   const newRefreshToken = createRefreshToken(payload.userId);
 
   await db.insert(refreshTokens).values({

@@ -8,7 +8,11 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
-import { emailVerificationMailgenContent, sendEmail } from "../../utils/mail";
+import {
+  emailVerificationMailgenContent,
+  forgotPasswordMailgenContent,
+  sendEmail,
+} from "../../utils/mail";
 import logger from "../../logger/winston.logger";
 
 const generateAccessAndRefreshToken = async (userId: string) => {
@@ -318,11 +322,143 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   } catch (error) {}
 });
 
+const forgotPasswordRequest = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { email } = req.body;
+    const user = await db.query.User.findFirst({
+      where: eq(User.email, email),
+    });
+
+    if (!user) {
+      throw new ApiError(404, "User does not exists");
+    }
+
+    const { hashedToken, unHashedToken, tokenExpiry } =
+      generateTemporaryToken();
+
+    await db
+      .update(User)
+      .set({
+        forgotPasswordToken: hashedToken,
+        forgotPasswordTokenExpiresAt: new Date(tokenExpiry),
+      })
+      .where(eq(User.id, user.id));
+
+    await sendEmail({
+      email: user.email,
+      subject: "Password reset request",
+      mailgenContent: forgotPasswordMailgenContent(
+        user.username!,
+        `${process.env.FORGOT_PASSWORD_REDIRECT_URL}/${unHashedToken}`
+      ),
+    });
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          {},
+          "Password reset mail has been sent on your mail id"
+        )
+      );
+  }
+);
+
+const resetForgottenPassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { resetToken } = req.params;
+    const { newPassword } = req.body;
+
+    let hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    const user = await db.query.User.findFirst({
+      where: and(
+        eq(User.forgotPasswordToken, hashedToken),
+        gt(User.forgotPasswordTokenExpiresAt, new Date())
+      ),
+    });
+
+    if (!user) {
+      throw new ApiError(400, "Token is invalid or expired");
+    }
+
+    const hashPassword = await bcrypt.hash(newPassword, 12);
+
+    await db.update(User).set({
+      password: hashPassword,
+      forgotPasswordToken: null,
+      forgotPasswordTokenExpiresAt: null,
+    });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Password reset successfully"));
+  }
+);
+
+const changeCurrentPassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await db.query.User.findFirst({
+      where: eq(User.id, req.user!.userId),
+    });
+
+    const isPasswordValid = bcrypt.compare(oldPassword, user!.password!);
+
+    if (!isPasswordValid) {
+      throw new ApiError(401, "Invalid old password");
+    }
+
+    const hashPassword = await bcrypt.hash(newPassword, 12);
+    await db
+      .update(User)
+      .set({ password: hashPassword })
+      .where(eq(User.id, user?.id!));
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Password changed successfully"));
+  }
+);
+
+const assignRole = asyncHandler(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const { role } = req.body;
+
+  const user = await db.query.User.findFirst({
+    where: eq(User.id, userId),
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  await db.update(User).set({ role: role }).where(eq(User.id, user.id));
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Role changed for the user"));
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "Current user fetched successfully"));
+});
 export {
   registerUser,
   loginUser,
   logoutUser,
   verifyEmail,
   resendEmailVerification,
-  refreshAccessToken
+  refreshAccessToken,
+  forgotPasswordRequest,
+  resetForgottenPassword,
+  changeCurrentPassword,
+  assignRole,
 };

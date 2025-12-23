@@ -1,0 +1,328 @@
+import type { Request, Response } from "express";
+import jwt from "jsonwebtoken";
+import { User } from "../../db/schema";
+import { db } from "../../config/db";
+import { and, eq, gt, or } from "drizzle-orm";
+import { ApiError } from "../../utils/ApiError";
+import { ApiResponse } from "../../utils/ApiResponse";
+import { asyncHandler } from "../../utils/asyncHandler";
+import bcrypt from "bcrypt";
+import crypto from "crypto";
+import { emailVerificationMailgenContent, sendEmail } from "../../utils/mail";
+import logger from "../../logger/winston.logger";
+
+const generateAccessAndRefreshToken = async (userId: string) => {
+  try {
+    const user = await db.query.User.findFirst({
+      where: eq(User.id, userId),
+    });
+
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    const accessToken = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+      },
+      process.env.ACCESS_TOKEN_SECRET as string,
+      { expiresIn: process.env.ACCESS_TOKEN_EXPIRY } as jwt.SignOptions
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      process.env.REFRESH_TOKEN_SECRET as string,
+      { expiresIn: process.env.REFRESH_TOKEN_EXPIRY } as jwt.SignOptions
+    );
+
+    await db
+      .update(User)
+      .set({ refreshToken: refreshToken })
+      .where(eq(User.id, userId));
+
+    return { accessToken, refreshToken };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    console.error("Token generation error:", error);
+    throw new ApiError(
+      500,
+      "Something went wrong while generating the access and refresh tokens"
+    );
+  }
+};
+
+const generateTemporaryToken = () => {
+  const unHashedToken = crypto.randomBytes(32).toString("hex");
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(unHashedToken)
+    .digest("hex");
+
+  const USER_TEMPORARY_TOKEN_EXPIRY = 20 * 60 * 1000; // 20 minutes
+  const tokenExpiry = Date.now() + USER_TEMPORARY_TOKEN_EXPIRY;
+  return { hashedToken, unHashedToken, tokenExpiry };
+};
+
+const registerUser = asyncHandler(async (req: Request, res: Response) => {
+  const { email, username, password } = req.body;
+
+  const existedUser = await db.query.User.findFirst({
+    where: or(eq(User.email, email), eq(User.username, username)),
+  });
+
+  if (existedUser) {
+    throw new ApiError(400, "User with given email or username already exists");
+  }
+
+  const { hashedToken, unHashedToken, tokenExpiry } = generateTemporaryToken();
+
+  const hashPassword = await bcrypt.hash(password, 12);
+
+  const [user] = await db
+    .insert(User)
+    .values({
+      email,
+      password: hashPassword,
+      username,
+      emailVerificationToken: hashedToken,
+      emailVerificationExpiry: new Date(tokenExpiry),
+      loginType: "email_password",
+    })
+    .returning();
+
+  await sendEmail({
+    email: user.email,
+    subject: "Please verify your email",
+    mailgenContent: emailVerificationMailgenContent(
+      user.username!,
+      `${req.protocol}://${req.get(
+        "host"
+      )}/api/v1/users/verify-email/${unHashedToken}`
+    ),
+  });
+
+  if (!user) {
+    throw new ApiError(500, "Failed to register user");
+  }
+
+  return res
+    .status(201)
+    .json(
+      new ApiResponse(
+        201,
+        { user: user },
+        "Users registered successfully and verification email has been sent on your email."
+      )
+    );
+});
+
+const loginUser = asyncHandler(async (req: Request, res: Response) => {
+  const { email, username, password } = req.body;
+
+  if (!username && !email) {
+    throw new ApiError(400, "Username or email is required to login");
+  }
+
+  const user = await db.query.User.findFirst({
+    where: or(eq(User.email, email), eq(User.username, username)),
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  const isPasswordValid = bcrypt.compare(password, user.password!);
+
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid user credentials");
+  }
+
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user.id
+  );
+
+  const loggedInUser = await db.query.User.findFirst({
+    where: eq(User.id, user.id),
+  });
+
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  };
+
+  return res
+    .status(200)
+    .cookie("refreshToken", refreshToken, options)
+    .cookie("accessToken", accessToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        { user: loggedInUser, accessToken, refreshToken },
+        "User logged in successfully"
+      )
+    );
+});
+
+const logoutUser = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, "Unauthorized");
+  }
+  await db
+    .update(User)
+    .set({ refreshToken: null })
+    .where(eq(User.id, req.user.userId));
+
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  };
+
+  return res
+    .status(200)
+    .clearCookie("refreshToken", options)
+    .clearCookie("accessToken", options)
+    .json(new ApiResponse(200, {}, "User logged out successfully"));
+});
+
+const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+  const { verificationToken } = req.params;
+
+  if (!verificationToken) {
+    throw new ApiError(400, "Email verification token in missing");
+  }
+  let hashedToken = crypto
+    .createHash("sha256")
+    .update(verificationToken)
+    .digest("hex");
+
+  const user = await db.query.User.findFirst({
+    where: and(
+      eq(User.emailVerificationToken, hashedToken),
+      gt(User.emailVerificationExpiry, new Date())
+    ),
+  });
+
+  if (!user) {
+    throw new ApiError(400, "Token is invalid or expired");
+  }
+
+  await db
+    .update(User)
+    .set({
+      isEmailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpiry: null,
+    })
+    .where(eq(User.id, user.id));
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { isEmailVerified: true }, "Email is verified"));
+});
+
+const resendEmailVerification = asyncHandler(
+  async (req: Request, res: Response) => {
+    const user = await db.query.User.findFirst({
+      where: eq(User.id, req.user!.userId),
+    });
+
+    if (!user) {
+      throw new ApiError(404, "User does not exists", []);
+    }
+
+    if (user.isEmailVerified) {
+      throw new ApiError(409, "Email is already verified!");
+    }
+
+    const { hashedToken, unHashedToken, tokenExpiry } =
+      generateTemporaryToken();
+
+    await db
+      .update(User)
+      .set({
+        emailVerificationToken: hashedToken,
+        emailVerificationExpiry: new Date(tokenExpiry),
+      })
+      .where(eq(User.id, user.id));
+
+    await sendEmail({
+      email: user.email,
+      subject: "Please verify your email",
+      mailgenContent: emailVerificationMailgenContent(
+        user.username!,
+        `${req.protocol}://${req.get(
+          "host"
+        )}/api/v1/users/verify-email/${unHashedToken}`
+      ),
+    });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Mail has been sent to your mail ID"));
+  }
+);
+
+const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
+
+  logger.info(`Incoming Refresh Token: ${incomingRefreshToken}`);
+
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, "Refresh token is missing");
+  }
+
+  try {
+    const decodedToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET as string
+    ) as jwt.JwtPayload;
+
+    const user = await db.query.User.findFirst({
+      where: eq(User.id, decodedToken.userId),
+    });
+
+    if (!user) {
+      throw new ApiError(401, "Invalid refresh token");
+    }
+
+    if (incomingRefreshToken !== user?.refreshToken) {
+      throw new ApiError(401, "Refresh token is expired or used");
+    }
+    const options = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    };
+
+    const { accessToken, refreshToken: newRefreshToken } =
+      await generateAccessAndRefreshToken(user.id);
+
+    await db.update(User).set({ refreshToken: newRefreshToken });
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", newRefreshToken, options)
+      .json(
+        new ApiResponse(
+          200,
+          { accessToken, refreshToken: newRefreshToken },
+          "Access token refreshed"
+        )
+      );
+  } catch (error) {}
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  verifyEmail,
+  resendEmailVerification,
+  refreshAccessToken
+};

@@ -14,6 +14,7 @@ import {
   sendEmail,
 } from "../../utils/mail";
 import logger from "../../logger/winston.logger";
+import { log } from "console";
 
 const generateAccessAndRefreshToken = async (userId: string) => {
   try {
@@ -141,7 +142,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, "User does not exist");
   }
 
-  const isPasswordValid = bcrypt.compare(password, user.password!);
+  const isPasswordValid = await bcrypt.compare(password, user.password!);
 
   if (!isPasswordValid) {
     throw new ApiError(401, "Invalid user credentials");
@@ -153,6 +154,15 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   const loggedInUser = await db.query.User.findFirst({
     where: eq(User.id, user.id),
+    columns: {
+      id: true,
+      email: true,
+      username: true,
+      role: true,
+      profilePicture: true,
+      isEmailVerified: true,
+      lastLoginAt: true,
+    },
   });
 
   const options = {
@@ -336,6 +346,10 @@ const forgotPasswordRequest = asyncHandler(
     const { hashedToken, unHashedToken, tokenExpiry } =
       generateTemporaryToken();
 
+    logger.info(`Unhashed Token: ${unHashedToken}`);
+    logger.info(`Hashed Token: ${hashedToken}`);
+    logger.info(`Token Expiry: ${tokenExpiry}`);
+
     await db
       .update(User)
       .set({
@@ -370,10 +384,14 @@ const resetForgottenPassword = asyncHandler(
     const { resetToken } = req.params;
     const { newPassword } = req.body;
 
-    let hashedToken = crypto
+    logger.info(`Reset Token: ${resetToken}`);
+
+    const hashedToken = crypto
       .createHash("sha256")
       .update(resetToken)
       .digest("hex");
+
+    logger.info(`Hashed Reset Token: ${hashedToken}`);
 
     const user = await db.query.User.findFirst({
       where: and(
@@ -386,13 +404,22 @@ const resetForgottenPassword = asyncHandler(
       throw new ApiError(400, "Token is invalid or expired");
     }
 
+    const isSamePassword = await bcrypt.compare(newPassword, user.password!);
+
+    if (isSamePassword) {
+      throw new ApiError(400, "New password cannot be same as old password");
+    }
+
     const hashPassword = await bcrypt.hash(newPassword, 12);
 
-    await db.update(User).set({
-      password: hashPassword,
-      forgotPasswordToken: null,
-      forgotPasswordTokenExpiresAt: null,
-    });
+    await db
+      .update(User)
+      .set({
+        password: hashPassword,
+        forgotPasswordToken: null,
+        forgotPasswordTokenExpiresAt: null,
+      })
+      .where(eq(User.id, user.id));
 
     return res
       .status(200)
@@ -412,6 +439,11 @@ const changeCurrentPassword = asyncHandler(
 
     if (!isPasswordValid) {
       throw new ApiError(401, "Invalid old password");
+    }
+    const isSamePassword = await bcrypt.compare(newPassword, user!.password!);
+
+    if (isSamePassword) {
+      throw new ApiError(400, "New password cannot be same as old password");
     }
 
     const hashPassword = await bcrypt.hash(newPassword, 12);
@@ -450,6 +482,35 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, req.user, "Current user fetched successfully"));
 });
+
+const handleSocialLogin = asyncHandler(async (req: Request, res: Response) => {
+  const user = await db.query.User.findFirst({
+    where: eq(User.id, req.user!.userId),
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user.id
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  };
+
+  return res
+    .status(301)
+    .cookie("accessToken", accessToken, options) // set the access token in the cookie
+    .cookie("refreshToken", refreshToken, options) // set the refresh token in the cookie
+    .redirect(
+      // redirect user to the frontend with access and refresh token in case user is not using cookies
+      `${process.env.CLIENT_SSO_REDIRECT_URL}?accessToken=${accessToken}&refreshToken=${refreshToken}`
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -461,5 +522,6 @@ export {
   resetForgottenPassword,
   changeCurrentPassword,
   assignRole,
-  getCurrentUser
+  getCurrentUser,
+  handleSocialLogin,
 };

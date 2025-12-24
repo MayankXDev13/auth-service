@@ -11,8 +11,10 @@ import {
   changeCurrentPassword,
   assignRole,
   getCurrentUser,
+  handleSocialLogin,
 } from "../../controllers/auth/user.controller";
 import { verifyJWT } from "../../middlewares/auth.middleware";
+import passport from "passport";
 
 const router = Router();
 
@@ -34,5 +36,33 @@ router
 
 router.route("/assign-role/:userId").post(verifyJWT, assignRole);
 router.route("/current-user").get(verifyJWT, getCurrentUser);
+
+// SSO routes
+
+router.route("/google").get(
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+  }),
+  (req, res) => {
+    res.send("redirecting to google...");
+  }
+);
+
+router.route("/github").get(
+  passport.authenticate("github", {
+    scope: ["profile", "email"],
+  }),
+  (req, res) => {
+    res.send("redirecting to github...");
+  }
+);
+
+router
+  .route("/google/callback")
+  .get(passport.authenticate("google"), handleSocialLogin);
+
+router
+  .route("/github/callback")
+  .get(passport.authenticate("github"), handleSocialLogin);
 
 export default router;

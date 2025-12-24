@@ -1,0 +1,2 @@
+ALTER TABLE "users" ALTER COLUMN "forgot_password_token_expires_at" SET DATA TYPE timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "users" ALTER COLUMN "email_verification_expiry" SET DATA TYPE timestamp with time zone;

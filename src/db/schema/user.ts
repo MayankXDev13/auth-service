@@ -29,11 +29,20 @@ export const User = pgTable(
       .notNull(),
     refreshToken: varchar("refresh_token", { length: 512 }),
     forgotPasswordToken: varchar("forgot_password_token", { length: 512 }),
-    forgotPasswordTokenExpiresAt: timestamp("forgot_password_token_expires_at"),
+    forgotPasswordTokenExpiresAt: timestamp(
+      "forgot_password_token_expires_at",
+      {
+        mode: "date",
+        withTimezone: true,
+      }
+    ),
     emailVerificationToken: varchar("email_verification_token", {
       length: 512,
     }),
-    emailVerificationExpiry: timestamp("email_verification_expiry"),
+    emailVerificationExpiry: timestamp("email_verification_expiry", {
+      mode: "date",
+      withTimezone: true,
+    }),
     lastLoginAt: timestamp("last_login_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

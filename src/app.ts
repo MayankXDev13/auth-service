@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import passport from "passport";
 import morganMiddleware from "./logger/morgan.logger";
 import session from "express-session";
+import "./passport/index"; // Passport strategies
 
 const app: Application = express();
 
@@ -19,9 +20,15 @@ app.use(cookieParser());
 
 app.use(
   session({
+    name: "auth-session",
     secret: process.env.EXPRESS_SESSION_SECRET as string,
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+    },
   })
 );
 

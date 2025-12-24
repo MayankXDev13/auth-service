@@ -484,8 +484,10 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const handleSocialLogin = asyncHandler(async (req: Request, res: Response) => {
+  logger.info(req);
+
   const user = await db.query.User.findFirst({
-    where: eq(User.id, req.user!.userId),
+    where: eq(User.id, req.user?.id as string),
   });
 
   if (!user) {
@@ -495,6 +497,8 @@ const handleSocialLogin = asyncHandler(async (req: Request, res: Response) => {
   const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
     user.id
   );
+
+  
 
   const options = {
     httpOnly: true,

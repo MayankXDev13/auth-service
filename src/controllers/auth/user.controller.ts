@@ -461,4 +461,5 @@ export {
   resetForgottenPassword,
   changeCurrentPassword,
   assignRole,
+  getCurrentUser
 };

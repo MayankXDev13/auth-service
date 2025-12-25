@@ -14,7 +14,7 @@ import {
   sendEmail,
 } from "../../utils/mail";
 import logger from "../../logger/winston.logger";
-import { log } from "console";
+import { posthog } from "../../lib/posthog";
 
 const generateAccessAndRefreshToken = async (userId: string) => {
   try {
@@ -101,6 +101,10 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     })
     .returning();
 
+  if (!user) {
+    throw new ApiError(500, "Failed to register user");
+  }
+
   await sendEmail({
     email: user.email,
     subject: "Please verify your email",
@@ -112,9 +116,16 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     ),
   });
 
-  if (!user) {
-    throw new ApiError(500, "Failed to register user");
-  }
+  // PostHog "user_registered"
+  // signup count
+  // signup conversion funnel
+  posthog.capture({
+    distinctId: user.id,
+    event: "user_registered",
+    properties: {
+      method: user.loginType,
+    },
+  });
 
   return res
     .status(201)
@@ -165,6 +176,17 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
+  // PostHog "user_logged_in"
+  // daily active users
+  // login success rate
+  posthog.capture({
+    distinctId: user.id,
+    event: "user_logged_in",
+    properties: {
+      method: "password",
+    },
+  });
+
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -190,13 +212,20 @@ const logoutUser = asyncHandler(async (req: Request, res: Response) => {
   await db
     .update(User)
     .set({ refreshToken: null })
-    .where(eq(User.id, req.user.userId));
+    .where(eq(User.id, req.user.userId!));
 
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
   };
 
+  // PostHog "user_logged_out"
+  // session behavior
+  // drop-off tracking
+  posthog.capture({
+    distinctId: req.user.userId,
+    event: "user_logged_out",
+  });
   return res
     .status(200)
     .clearCookie("refreshToken", options)
@@ -235,6 +264,13 @@ const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
     })
     .where(eq(User.id, user.id));
 
+  // PostHog "email_verified"
+  // email verification funnel
+  // signup  -> activation conversion
+  posthog.capture({
+    distinctId: user.id,
+    event: "email_verified",
+  });
   return res
     .status(200)
     .json(new ApiResponse(200, { isEmailVerified: true }, "Email is verified"));
@@ -243,7 +279,7 @@ const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
 const resendEmailVerification = asyncHandler(
   async (req: Request, res: Response) => {
     const user = await db.query.User.findFirst({
-      where: eq(User.id, req.user!.userId),
+      where: eq(User.id, req.user!.userId!),
     });
 
     if (!user) {
@@ -274,6 +310,14 @@ const resendEmailVerification = asyncHandler(
           "host"
         )}/api/v1/users/verify-email/${unHashedToken}`
       ),
+    });
+
+    // PostHog "resend_email_verification"
+    // detact eamil delivery issues
+    // UX friction indicator
+    posthog.capture({
+      distinctId: user.id,
+      event: "resend_email_verification",
     });
 
     return res
@@ -318,6 +362,15 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
       await generateAccessAndRefreshToken(user.id);
 
     await db.update(User).set({ refreshToken: newRefreshToken });
+
+    // PostHog "access_token_refreshed"
+    // session longevity
+    // token rotation health
+    posthog.capture({
+      distinctId: user.id,
+      event: "access_token_refreshed",
+    });
+
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
@@ -365,6 +418,15 @@ const forgotPasswordRequest = asyncHandler(
         user.username!,
         `${process.env.FORGOT_PASSWORD_REDIRECT_URL}/${unHashedToken}`
       ),
+    });
+
+    // PostHog "password_reset_requested"
+    // account recovery tracking
+    // security insights
+
+    posthog.capture({
+      distinctId: user.id,
+      event: "password_reset_requested",
     });
 
     return res
@@ -421,6 +483,13 @@ const resetForgottenPassword = asyncHandler(
       })
       .where(eq(User.id, user.id));
 
+    // PostHog "password_reset_completed"
+    // recovery success rate
+    posthog.capture({
+      distinctId: user.id,
+      event: "password_reset_completed",
+    });
+
     return res
       .status(200)
       .json(new ApiResponse(200, {}, "Password reset successfully"));
@@ -432,7 +501,7 @@ const changeCurrentPassword = asyncHandler(
     const { oldPassword, newPassword } = req.body;
 
     const user = await db.query.User.findFirst({
-      where: eq(User.id, req.user!.userId),
+      where: eq(User.id, req.user!.userId!),
     });
 
     const isPasswordValid = bcrypt.compare(oldPassword, user!.password!);
@@ -451,6 +520,14 @@ const changeCurrentPassword = asyncHandler(
       .update(User)
       .set({ password: hashPassword })
       .where(eq(User.id, user?.id!));
+
+    // PostHog "password_changed"
+    // security behavior
+    // account hygiene
+    posthog.capture({
+      distinctId: user?.id!,
+      event: "password_changed",
+    });
 
     return res
       .status(200)
@@ -472,6 +549,17 @@ const assignRole = asyncHandler(async (req: Request, res: Response) => {
 
   await db.update(User).set({ role: role }).where(eq(User.id, user.id));
 
+  // PostHog "user_role_changed"
+  // Admin actions audit
+  // RBAC analytics
+  posthog.capture({
+    distinctId: user.id,
+    event: "user_role_changed",
+    properties: {
+      role: role,
+    },
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Role changed for the user"));
@@ -484,8 +572,6 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const handleSocialLogin = asyncHandler(async (req: Request, res: Response) => {
-  logger.info(req);
-
   const user = await db.query.User.findFirst({
     where: eq(User.id, req.user?.id as string),
   });
@@ -498,13 +584,20 @@ const handleSocialLogin = asyncHandler(async (req: Request, res: Response) => {
     user.id
   );
 
-  
-
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
   };
 
+  // PostHog "user_logged_in"
+  // OAuth vs Email Comparison
+  posthog.capture({
+    distinctId: user.id,
+    event: "user_logged_in",
+    properties: {
+      method: user.loginType,
+    },
+  });
   return res
     .status(301)
     .cookie("accessToken", accessToken, options) // set the access token in the cookie

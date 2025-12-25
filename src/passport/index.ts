@@ -7,68 +7,100 @@ import { db } from "../config/db";
 import { eq } from "drizzle-orm";
 import logger from "../logger/winston.logger";
 
-// Serialize
 passport.serializeUser((user: any, next) => {
+  logger.info("[PASSPORT] serializeUser called", {
+    userId: user?.id,
+    email: user?.email,
+    loginType: user?.loginType,
+  });
+
+  if (!user?.id) {
+    logger.error("[PASSPORT] serializeUser failed: user.id missing", {
+      user,
+    });
+    return next(new Error("serializeUser called without user.id"));
+  }
+
   next(null, user.id);
 });
 
-// Deserialize
-
 passport.deserializeUser(async (id: string, next) => {
   try {
+    logger.info("[PASSPORT] deserializeUser called", { id });
+
     const user = await db.query.User.findFirst({
       where: eq(User.id, id),
     });
 
-    if (user) next(null, user);
-    else next(new ApiError(404, "User does not exist"), null);
+    if (!user) {
+      logger.error("[PASSPORT] deserializeUser failed: user not found", {
+        id,
+      });
+      return next(new ApiError(404, "User does not exist"));
+    }
+
+    logger.info("[PASSPORT] deserializeUser success", {
+      id: user.id,
+      email: user.email,
+      loginType: user.loginType,
+    });
+
+    next(null, user);
   } catch (error) {
+    logger.error("[PASSPORT] deserializeUser error", { error });
     next(
       new ApiError(
         500,
         "Something went wrong deserializing the user. Error: " + error
-      ),
-      null
+      )
     );
   }
 });
 
-// Google Strategy
 passport.use(
   new GoogleStrategy(
     {
-      clientID: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL as string,
+      clientID: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL!,
     },
     async (_, __, profile, next) => {
-      const user = await db.query.User.findFirst({
-        where: eq(User.email, profile._json.email as string),
-      });
+      try {
+        logger.info("[GOOGLE] OAuth callback received", {
+          email: profile._json.email,
+          googleId: profile._json.sub,
+        });
 
-      if (user) {
-        if (user.loginType !== "google") {
-          return next(
-            new ApiError(
-              400,
-              "You have previously registered using " +
-                user.loginType?.toLowerCase()?.split("_").join(" ") +
-                ". Please use the " +
-                user.loginType?.toLowerCase()?.split("_").join(" ") +
-                " login option to access your account."
-            ),
-            null
-          );
-        } else {
+        const user = await db.query.User.findFirst({
+          where: eq(User.email, profile._json.email as string),
+        });
+
+        if (user) {
+          logger.info("[GOOGLE] Existing user found", {
+            id: user.id,
+            loginType: user.loginType,
+          });
+
+          if (user.loginType !== "google") {
+            return next(
+              new ApiError(
+                400,
+                `You registered using ${user.loginType}. Please use that login method.`
+              )
+            );
+          }
+
           return next(null, user);
         }
-      } else {
+
+        logger.info("[GOOGLE] Creating new user");
+
         const [createdUser] = await db
           .insert(User)
           .values({
-            email: profile._json.email as string,
-            password: profile._json.sub as string,
-            username: profile._json.email?.split("@")[0] as string,
+            email: profile._json.email!,
+            password: profile._json.sub!,
+            username: profile._json.email!.split("@")[0],
             isEmailVerified: true,
             role: "user",
             profilePicture: profile._json.picture,
@@ -76,82 +108,94 @@ passport.use(
           })
           .returning();
 
-        if (createdUser) {
-          logger.info("Created user: ", JSON.stringify(createdUser));
-          next(null, createdUser);
-        } else {
-          next(new ApiError(500, "Error while registering the user"), null);
+        if (!createdUser?.id) {
+          logger.error("[GOOGLE] User created but ID missing", {
+            createdUser,
+          });
+          return next(new ApiError(500, "User created but ID missing"));
         }
+
+        logger.info("[GOOGLE] User created successfully", {
+          id: createdUser.id,
+          email: createdUser.email,
+        });
+
+        next(null, createdUser);
+      } catch (err) {
+        logger.error("[GOOGLE] OAuth error", { err });
+        next(err as Error);
       }
     }
   )
 );
 
-// GitHub Strategy
 passport.use(
   new GitHubStrategy(
     {
-      clientID: process.env.GITHUB_CLIENT_ID as string,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
-      callbackURL: process.env.GITHUB_CALLBACK_URL as string,
+      clientID: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      callbackURL: process.env.GITHUB_CALLBACK_URL!,
     },
     async (_, __, profile, next) => {
-      logger.info("Github profile: " + JSON.stringify(profile));
+      try {
+        logger.info("[GITHUB] OAuth callback", {
+          email: profile._json.email,
+          githubId: profile._json.node_id,
+        });
 
-      const user = await db.query.User.findFirst({
-        where: eq(User.email, profile._json.email as string),
-      });
+        const user = await db.query.User.findFirst({
+          where: eq(User.email, profile._json.email as string),
+        });
 
-      if (user) {
-        if (user.loginType !== "github") {
-          next(
-            new ApiError(
-              400,
-              "You have previously registered using " +
-                user.loginType?.toLowerCase()?.split("_").join(" ") +
-                ". Please use the " +
-                user.loginType?.toLowerCase()?.split("_").join(" ") +
-                " login option to access your account."
-            ),
-            null
-          );
-        } else {
-          next(null, user);
-        }
-      } else {
-        if (!profile._json.email) {
-          next(
-            new ApiError(
-              400,
-              "User does not have a public email associated with their account. Please try another login method"
-            ),
-            null
-          );
-        } else {
-          const userNameExist = await db.query.User.findFirst({
-            where: eq(User.username, profile?.username as string),
+        if (user) {
+          logger.info("[GITHUB] Existing user found", {
+            id: user.id,
+            loginType: user.loginType,
           });
 
-          const [createdUser] = await db
-            .insert(User)
-            .values({
-              email: profile._json.email!,
-              password: profile._json.sub,
-              username: profile._json.email!.split("@")[0],
-              isEmailVerified: true,
-              role: "user",
-              loginType: "google",
-              profilePicture: profile._json.picture,
-            })
-            .returning();
-
-          if (createdUser) {
-            logger.info("Created user: ", createdUser);
-            next(null, createdUser);
-          } else {
-            next(new ApiError(500, "Error while registering the user"), null);
+          if (user.loginType !== "github") {
+            return next(
+              new ApiError(
+                400,
+                `You registered using ${user.loginType}. Please use that login method.`
+              )
+            );
           }
+
+          return next(null, user);
         }
+
+        logger.info("[GITHUB] Creating new user");
+
+        const [createdUser] = await db
+          .insert(User)
+          .values({
+            email: profile._json.email!,
+            password: profile._json.node_id,
+            username: profile._json.email!.split("@")[0],
+            isEmailVerified: true,
+            role: "user",
+            loginType: "github",
+            profilePicture: profile._json.avatar_url,
+          })
+          .returning();
+
+        if (!createdUser?.id) {
+          logger.error("[GITHUB] User created but ID missing", {
+            createdUser,
+          });
+          return next(new ApiError(500, "User created but ID missing"));
+        }
+
+        logger.info("[GITHUB] User created successfully", {
+          id: createdUser.id,
+          email: createdUser.email,
+        });
+
+        next(null, createdUser);
+      } catch (err) {
+        logger.error("[GITHUB] OAuth error", { err });
+        next(err as Error);
       }
     }
   )

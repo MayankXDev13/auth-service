@@ -6,6 +6,7 @@ import { User } from "../db/schema";
 import { db } from "../config/db";
 import { eq } from "drizzle-orm";
 import logger from "../logger/winston.logger";
+import { posthog } from "../lib/posthog";
 
 passport.serializeUser((user: any, next) => {
   logger.info("[PASSPORT] serializeUser called", {
@@ -120,6 +121,17 @@ passport.use(
           email: createdUser.email,
         });
 
+        // PostHog "user_registered"
+        // signup count
+        // signup conversion funnel
+        posthog.capture({
+          distinctId: createdUser.id,
+          event: "user_registered",
+          properties: {
+            method: createdUser.loginType,
+          },
+        });
+
         next(null, createdUser);
       } catch (err) {
         logger.error("[GOOGLE] OAuth error", { err });
@@ -190,6 +202,17 @@ passport.use(
         logger.info("[GITHUB] User created successfully", {
           id: createdUser.id,
           email: createdUser.email,
+        });
+
+        // PostHog "user_registered"
+        // signup count
+        // signup conversion funnel
+        posthog.capture({
+          distinctId: createdUser.id,
+          event: "user_registered",
+          properties: {
+            method: createdUser.loginType,
+          },
         });
 
         next(null, createdUser);

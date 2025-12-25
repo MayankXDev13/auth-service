@@ -23,7 +23,6 @@ export default function ForgotPasswordForm() {
 
   const isLoading = forgotPassword.isPending;
 
-  /* ------------------------------- FORM ------------------------------- */
   const form = useForm<ForgotPasswordInput>({
     defaultValues: {
       email: "",
@@ -49,7 +48,7 @@ export default function ForgotPasswordForm() {
     },
   });
 
-  /* ------------------------------- UI -------------------------------- */
+ 
   return (
     <Card
       className="

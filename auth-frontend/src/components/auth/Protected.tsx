@@ -1,28 +1,15 @@
 "use client";
 
-import { useSession } from "@/hooks/auth/useSession";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useAuthStore } from "@/stores/auth.store";
+import { redirect } from "next/navigation";
 
 export function Protected({ children }: { children: React.ReactNode }) {
-  const { data: user, isLoading } = useSession();
-  const router = useRouter();
+  const { user, loading } = useAuthStore();
+ 
+  
 
-  useEffect(() => {
-    if (isLoading) return;
-
-    if (!user) {
-      router.replace("/login");
-    }
-  }, [user, isLoading, router]);
-
-  if (isLoading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" />
-      </div>
-    );
-  }
+  if (loading) return <p>Loading...</p>;
+  if (!user) redirect("/login");
 
   return <>{children}</>;
 }

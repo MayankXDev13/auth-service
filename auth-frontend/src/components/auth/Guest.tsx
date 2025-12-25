@@ -1,20 +1,21 @@
 "use client";
 
-import { useSession } from "@/hooks/auth/useSession";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useAuthStore } from "@/stores/auth.store";
+import { useRouter } from "next/navigation";
 
 export function Guest({ children }: { children: React.ReactNode }) {
-  const { data: user, isLoading } = useSession();
+  const { user, loading } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!loading && user) {
       router.replace("/dashboard");
     }
-  }, [user, isLoading, router]);
+  }, [user, loading, router]);
 
-  if (isLoading) return null;
+  if (loading) return null;
+  if (user) return null;
 
   return <>{children}</>;
 }

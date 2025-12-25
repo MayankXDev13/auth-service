@@ -26,7 +26,7 @@ export default function ResetPasswordForm() {
 
   const isLoading = resetPassword.isPending;
 
-  /* ------------------------------- FORM ------------------------------- */
+
   const form = useForm<ResetPasswordInput>({
     defaultValues: {
       password: "",

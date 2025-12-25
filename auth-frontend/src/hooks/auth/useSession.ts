@@ -8,12 +8,11 @@ export const useSession = () => {
     queryFn: async () => {
       const res = await getCurrentUserApi();
 
-     
-      if (res.data?.accessToken) {
+      if (res?.data?.accessToken) {
         setAccessToken(res.data.accessToken);
       }
 
-      return res.data.user;
+      return res?.data?.user ?? null;
     },
     staleTime: 5 * 60 * 1000,
     retry: false,

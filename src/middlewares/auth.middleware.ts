@@ -29,6 +29,9 @@ export const verifyJWT = asyncHandler(
         where: eq(User.id, decodedToken.userId),
         columns: {
           id: true,
+          email: true,
+          username: true,
+          role: true,
         },
       });
 
@@ -36,7 +39,7 @@ export const verifyJWT = asyncHandler(
         throw new ApiError(401, "Invalid access token");
       }
 
-      req.user = { userId: user.id };
+      req.user = user;
 
       next();
     } catch (error) {

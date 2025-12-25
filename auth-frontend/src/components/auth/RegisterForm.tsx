@@ -33,10 +33,10 @@ export default function RegisterForm() {
     },
   });
 
-  /* ------------------------------- FORM ------------------------------- */
+  
   const form = useForm<RegisterInput>({
     defaultValues: {
-      name: "",
+      username: "",
       email: "",
       password: "",
     },
@@ -54,7 +54,7 @@ export default function RegisterForm() {
 
   const isLoading = registerMutation.isPending;
 
-  /* ------------------------------- UI -------------------------------- */
+ 
   return (
     <Card
       className="
@@ -81,12 +81,12 @@ export default function RegisterForm() {
         noValidate
       >
         {/* Name */}
-        <form.Field name="name">
+        <form.Field name="username">
           {(field) => (
             <div className="space-y-1">
               <Input
-                placeholder="Full name"
-                autoComplete="name"
+                placeholder="username"
+                autoComplete="username"
                 autoFocus
                 disabled={isLoading}
                 value={field.state.value}

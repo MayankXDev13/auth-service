@@ -17,7 +17,6 @@ import { useRouter } from "next/navigation";
 export default function LoginForm() {
   const router = useRouter();
 
-  /* ----------------------------- MUTATION ----------------------------- */
   const loginMutation = useMutation({
     mutationFn: (data: LoginInput) =>
       loginUserApi(data).then((res) => res.data),
@@ -40,7 +39,6 @@ export default function LoginForm() {
     },
   });
 
-  /* ------------------------------- FORM ------------------------------- */
   const form = useForm<LoginInput>({
     defaultValues: {
       email: "",
@@ -60,7 +58,6 @@ export default function LoginForm() {
 
   const isLoading = loginMutation.isPending;
 
-  /* ------------------------------- UI -------------------------------- */
   return (
     <Card
       className="

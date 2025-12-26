@@ -332,7 +332,7 @@ const resendEmailVerification = asyncHandler(
 
 const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   const incomingRefreshToken =
-    req.cookies.refreshToken || req.body.refreshToken;
+    (req.cookies && req.cookies.refreshToken) || (req.body && req.body.refreshToken);
 
   logger.info("Refresh token validation attempt");
 

@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../../db/schema";
 import { db } from "../../config/db";
-import { and, eq, gt, or } from "drizzle-orm";
+import { and, eq, gt, or, ne } from "drizzle-orm";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
@@ -611,6 +611,33 @@ const handleSocialLogin = asyncHandler(async (req: Request, res: Response) => {
   // );
 });
 
+const updateUsername = asyncHandler(async (req: Request, res: Response) => {
+  const { username } = req.body;
+  const userId = req.user!.id!;
+
+  // Check if username is already taken by another user
+  const existingUser = await db.query.User.findFirst({
+    where: and(eq(User.username, username), ne(User.id, userId)),
+  });
+
+  if (existingUser) {
+    throw new ApiError(409, "Username is already taken");
+  }
+
+  // Update username
+  await db.update(User).set({ username }).where(eq(User.id, userId));
+
+  // PostHog analytics
+  posthog.capture({
+    distinctId: userId,
+    event: "username_updated",
+  });
+
+  return res.status(200).json(
+    new ApiResponse(200, { username }, "Username updated successfully")
+  );
+});
+
 const uploadProfilePicture = asyncHandler(
   async (req: Request, res: Response) => {
     const file = (req as any).file;
@@ -686,5 +713,6 @@ export {
   assignRole,
   getCurrentUser,
   handleSocialLogin,
+  updateUsername,
   uploadProfilePicture,
 };

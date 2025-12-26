@@ -47,6 +47,13 @@ export const avatarUrlSchema = z.object({
   url: z.string().url("Invalid URL format"),
 });
 
+export const updateUsernameSchema = z.object({
+  username: z.string()
+    .min(3, "Username must be at least 3 characters")
+    .max(50, "Username cannot exceed 50 characters")
+    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
@@ -54,3 +61,4 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
 export type AvatarUrlInput = z.infer<typeof avatarUrlSchema>;
+export type UpdateUsernameInput = z.infer<typeof updateUsernameSchema>;

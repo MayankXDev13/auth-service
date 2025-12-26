@@ -5,8 +5,8 @@ declare global {
       email: string;
       username: string | null;
       role: "admin" | "user";
-      profilePicture: true;
-      isEmailVerified: true;
+      profilePicture?: string | null;
+      isEmailVerified?: boolean;
     }
 
     interface Request {

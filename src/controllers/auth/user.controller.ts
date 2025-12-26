@@ -16,6 +16,7 @@ import {
 import logger from "../../logger/winston.logger";
 import { posthog } from "../../lib/posthog";
 import { env } from "../../config/env";
+import { uploadBuffer, deleteObject } from "../../utils/s3";
 
 const generateAccessAndRefreshToken = async (userId: string) => {
   try {
@@ -165,10 +166,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
   );
 
   const loggedInUser = await db.query.User.findFirst({
-    where: and(
-      eq(User.id, user.id),
-      eq(User.isActive, true)
-    ),
+    where: and(eq(User.id, user.id), eq(User.isActive, true)),
     columns: {
       id: true,
       email: true,
@@ -332,7 +330,8 @@ const resendEmailVerification = asyncHandler(
 
 const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   const incomingRefreshToken =
-    (req.cookies && req.cookies.refreshToken) || (req.body && req.body.refreshToken);
+    (req.cookies && req.cookies.refreshToken) ||
+    (req.body && req.body.refreshToken);
 
   logger.info("Refresh token validation attempt");
 
@@ -387,7 +386,9 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
         )
       );
   } catch (error) {
-    logger.error("Token refresh error", { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Token refresh error", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     throw new ApiError(401, "Invalid or expired refresh token");
   }
 });
@@ -444,7 +445,7 @@ const forgotPasswordRequest = asyncHandler(
   }
 );
 
-  const resetForgottenPassword = asyncHandler(
+const resetForgottenPassword = asyncHandler(
   async (req: Request, res: Response) => {
     const { resetToken } = req.params;
     const { newPassword } = req.body;
@@ -610,6 +611,68 @@ const handleSocialLogin = asyncHandler(async (req: Request, res: Response) => {
   // );
 });
 
+const uploadProfilePicture = asyncHandler(
+  async (req: Request, res: Response) => {
+    const file = (req as any).file;
+    if (!file) {
+      throw new ApiError(400, "No file uploaded");
+    }
+    const { buffer, mimetype, originalname } = file;
+    const userId = req.user!.id!;
+
+    // Get current profile picture
+    const currentUser = await db.query.User.findFirst({
+      where: eq(User.id, userId),
+      columns: { profilePicture: true },
+    });
+    const oldUrl = currentUser?.profilePicture;
+
+    try {
+      const s3Url = await uploadBuffer(buffer, userId, mimetype, originalname);
+
+      // Delete old avatar if exists
+      if (oldUrl && oldUrl.includes(env.S3_BUCKET)) {
+        try {
+          const oldKey = oldUrl.split('/').slice(3).join('/');
+          await deleteObject(oldKey);
+        } catch (deleteError) {
+          logger.warn("Failed to delete old avatar", { error: deleteError });
+          // Don't fail the upload if delete fails
+        }
+      }
+
+      await db
+        .update(User)
+        .set({ profilePicture: s3Url })
+        .where(eq(User.id, userId));
+
+      // PostHog event
+      posthog.capture({
+        distinctId: userId,
+        event: "profile_picture_uploaded",
+      });
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            { profilePicture: s3Url },
+            "Profile picture uploaded successfully"
+          )
+        );
+    } catch (error) {
+      logger.error("Profile picture upload error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw new ApiError(
+        400,
+        error instanceof Error ? error.message : "Upload failed"
+      );
+    }
+  }
+);
+
 export {
   registerUser,
   loginUser,
@@ -623,4 +686,5 @@ export {
   assignRole,
   getCurrentUser,
   handleSocialLogin,
+  uploadProfilePicture,
 };

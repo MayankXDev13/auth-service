@@ -43,9 +43,14 @@ export const assignRoleSchema = z.object({
   }),
 });
 
+export const avatarUrlSchema = z.object({
+  url: z.string().url("Invalid URL format"),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
+export type AvatarUrlInput = z.infer<typeof avatarUrlSchema>;

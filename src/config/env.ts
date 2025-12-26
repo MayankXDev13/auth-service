@@ -37,6 +37,13 @@ const envSchema = z.object({
   // URLs
   CLIENT_SSO_REDIRECT_URL: z.string().url("CLIENT_SSO_REDIRECT_URL must be a valid URL"),
   FORGOT_PASSWORD_REDIRECT_URL: z.string().url("FORGOT_PASSWORD_REDIRECT_URL must be a valid URL"),
+
+  // AWS S3
+  AWS_ACCESS_KEY_ID: z.string().min(1, "AWS_ACCESS_KEY_ID is required"),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1, "AWS_SECRET_ACCESS_KEY is required"),
+  AWS_REGION: z.string().min(1, "AWS_REGION is required"),
+  S3_BUCKET: z.string().min(1, "S3_BUCKET is required"),
+  S3_PROFILE_PICS_PREFIX: z.string().default("profile-pics/"),
 });
 
 

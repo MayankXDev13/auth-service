@@ -1,4 +1,6 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
+import multer from "multer";
 import {
   registerUser,
   loginUser,
@@ -12,6 +14,7 @@ import {
   assignRole,
   getCurrentUser,
   handleSocialLogin,
+  uploadProfilePicture,
 } from "../../controllers/auth/user.controller";
 import { verifyJWT } from "../../middlewares/auth.middleware";
 import { validate } from "../../middlewares/validate.middleware";
@@ -25,6 +28,14 @@ import {
 } from "../../validators/auth.validator";
 import passport from "passport";
 
+const avatarLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: "Too many profile picture upload requests, please try again later.",
+});
+
+const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
+
 const router = Router();
 
 // Unsecured routes
@@ -37,7 +48,7 @@ router.route("/reset-password/:resetToken").post(validate(resetPasswordSchema), 
 
 // Secured routes
 router.route("/logout").post(verifyJWT, logoutUser);
-router.route("/avatar").post(verifyJWT);
+router.route("/avatar").post(avatarLimiter, upload.single("avatar"), verifyJWT, uploadProfilePicture);
 router.route("/change-password").post(verifyJWT, validate(changePasswordSchema), changeCurrentPassword);
 router
   .route("/resend-email-verification")

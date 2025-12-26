@@ -5,8 +5,10 @@ declare global {
       email: string;
       username: string | null;
       role: "admin" | "user";
+      profilePicture: true;
+      isEmailVerified: true;
     }
-    
+
     interface Request {
       user?: User;
     }

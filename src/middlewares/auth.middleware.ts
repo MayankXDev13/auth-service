@@ -29,6 +29,9 @@ export const verifyJWT = asyncHandler(
           email: true,
           username: true,
           role: true,
+          profilePicture: true,
+          isEmailVerified: true,
+          lastLoginAt: true,
         },
       });
 

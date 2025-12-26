@@ -1,5 +1,5 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import multer from "multer";
 import {
   registerUser,
@@ -40,7 +40,7 @@ const usernameUpdateLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
   max: 3, // 3 updates per day
   message: "Too many username updates, please try again later.",
-  keyGenerator: (req) => (req as any).user?.id || req.ip, // Rate limit per user
+  keyGenerator: (req) => (req as any).user?.id || ipKeyGenerator(req.ip as string), // Rate limit per user
 });
 
 const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });

@@ -23,10 +23,10 @@ const envSchema = z.object({
   // OAuth (Optional)
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_CALLBACK_URL: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z.string().url().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
-  GITHUB_CALLBACK_URL: z.string().optional(),
+  GITHUB_CALLBACK_URL: z.string().url().optional(),
 
   // Analytics (Optional)
   POSTHOG_API_KEY: z.string().optional(),

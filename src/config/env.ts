@@ -1,4 +1,5 @@
 import { z } from "zod";
+import "dotenv/config"
 
 const envSchema = z.object({
   // Application
@@ -38,7 +39,7 @@ const envSchema = z.object({
   FORGOT_PASSWORD_REDIRECT_URL: z.string().url("FORGOT_PASSWORD_REDIRECT_URL must be a valid URL"),
 });
 
-// Validate environment variables at startup
+
 export const env = envSchema.parse(process.env);
 
 // Type-safe environment variables

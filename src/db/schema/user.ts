@@ -55,5 +55,10 @@ export const User = pgTable(
     index("refresh_token_idx").on(table.refreshToken),
     index("forgot_password_token_idx").on(table.forgotPasswordToken),
     index("email_verification_token_idx").on(table.emailVerificationToken),
+    // Performance indexes for common queries
+    index("users_email_idx").on(table.email),
+    index("users_username_idx").on(table.username),
+    index("users_login_type_email_idx").on(table.loginType, table.email),
+    index("users_active_verified_idx").on(table.isActive, table.isEmailVerified),
   ]
 );

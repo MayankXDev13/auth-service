@@ -7,6 +7,7 @@ import { db } from "../config/db";
 import { eq } from "drizzle-orm";
 import logger from "../logger/winston.logger";
 import { posthog } from "../lib/posthog";
+import { env } from "../config/env";
 
 passport.serializeUser((user: any, next) => {
   logger.info("[PASSPORT] serializeUser called", {
@@ -61,11 +62,11 @@ passport.deserializeUser(async (id: string, next) => {
 passport.use(
   new GoogleStrategy(
     {
-      clientID: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL!,
+      clientID: env.GOOGLE_CLIENT_ID!,
+      clientSecret: env.GOOGLE_CLIENT_SECRET!,
+      callbackURL: env.GOOGLE_CALLBACK_URL!,
     },
-    async (_, __, profile, next) => {
+    async (_: any, __: any, profile: any, next: any) => {
       try {
         logger.info("[GOOGLE] OAuth callback received", {
           email: profile._json.email,
@@ -144,11 +145,11 @@ passport.use(
 passport.use(
   new GitHubStrategy(
     {
-      clientID: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      callbackURL: process.env.GITHUB_CALLBACK_URL!,
+      clientID: env.GITHUB_CLIENT_ID!,
+      clientSecret: env.GITHUB_CLIENT_SECRET!,
+      callbackURL: env.GITHUB_CALLBACK_URL!,
     },
-    async (_, __, profile, next) => {
+    async (_: any, __: any, profile: any, next: any) => {
       try {
         logger.info("[GITHUB] OAuth callback", {
           email: profile._json.email,

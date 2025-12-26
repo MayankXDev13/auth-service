@@ -15,6 +15,7 @@ import {
 } from "../../utils/mail";
 import logger from "../../logger/winston.logger";
 import { posthog } from "../../lib/posthog";
+import { env } from "../../config/env";
 
 const generateAccessAndRefreshToken = async (userId: string) => {
   try {
@@ -33,14 +34,14 @@ const generateAccessAndRefreshToken = async (userId: string) => {
         username: user.username,
         role: user.role,
       },
-      process.env.ACCESS_TOKEN_SECRET as string,
-      { expiresIn: process.env.ACCESS_TOKEN_EXPIRY } as jwt.SignOptions
+      env.ACCESS_TOKEN_SECRET,
+      { expiresIn: env.ACCESS_TOKEN_EXPIRY } as jwt.SignOptions
     );
 
     const refreshToken = jwt.sign(
       { userId: user.id },
-      process.env.REFRESH_TOKEN_SECRET as string,
-      { expiresIn: process.env.REFRESH_TOKEN_EXPIRY } as jwt.SignOptions
+      env.REFRESH_TOKEN_SECRET,
+      { expiresIn: env.REFRESH_TOKEN_EXPIRY } as jwt.SignOptions
     );
 
     await db
@@ -164,7 +165,10 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
   );
 
   const loggedInUser = await db.query.User.findFirst({
-    where: eq(User.id, user.id),
+    where: and(
+      eq(User.id, user.id),
+      eq(User.isActive, true)
+    ),
     columns: {
       id: true,
       email: true,
@@ -212,7 +216,7 @@ const logoutUser = asyncHandler(async (req: Request, res: Response) => {
   await db
     .update(User)
     .set({ refreshToken: null })
-    .where(eq(User.id, req.user.userId!));
+    .where(eq(User.id, req.user.id!));
 
   const options = {
     httpOnly: true,
@@ -223,7 +227,7 @@ const logoutUser = asyncHandler(async (req: Request, res: Response) => {
   // session behavior
   // drop-off tracking
   posthog.capture({
-    distinctId: req.user.userId,
+    distinctId: req.user.id,
     event: "user_logged_out",
   });
   return res
@@ -279,11 +283,11 @@ const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
 const resendEmailVerification = asyncHandler(
   async (req: Request, res: Response) => {
     const user = await db.query.User.findFirst({
-      where: eq(User.id, req.user!.userId!),
+      where: eq(User.id, req.user!.id!),
     });
 
     if (!user) {
-      throw new ApiError(404, "User does not exists", []);
+      throw new ApiError(404, "User does not exist");
     }
 
     if (user.isEmailVerified) {
@@ -330,7 +334,7 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   const incomingRefreshToken =
     req.cookies.refreshToken || req.body.refreshToken;
 
-  logger.info(`Incoming Refresh Token: ${incomingRefreshToken}`);
+  logger.info("Refresh token validation attempt");
 
   if (!incomingRefreshToken) {
     throw new ApiError(401, "Refresh token is missing");
@@ -339,7 +343,7 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   try {
     const decodedToken = jwt.verify(
       incomingRefreshToken,
-      process.env.REFRESH_TOKEN_SECRET as string
+      env.REFRESH_TOKEN_SECRET
     ) as jwt.JwtPayload;
 
     const user = await db.query.User.findFirst({
@@ -382,7 +386,10 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
           "Access token refreshed"
         )
       );
-  } catch (error) {}
+  } catch (error) {
+    logger.error("Token refresh error", { error: error instanceof Error ? error.message : 'Unknown error' });
+    throw new ApiError(401, "Invalid or expired refresh token");
+  }
 });
 
 const forgotPasswordRequest = asyncHandler(
@@ -399,9 +406,7 @@ const forgotPasswordRequest = asyncHandler(
     const { hashedToken, unHashedToken, tokenExpiry } =
       generateTemporaryToken();
 
-    logger.info(`Unhashed Token: ${unHashedToken}`);
-    logger.info(`Hashed Token: ${hashedToken}`);
-    logger.info(`Token Expiry: ${tokenExpiry}`);
+    logger.info("Password reset token generated for user");
 
     await db
       .update(User)
@@ -416,7 +421,7 @@ const forgotPasswordRequest = asyncHandler(
       subject: "Password reset request",
       mailgenContent: forgotPasswordMailgenContent(
         user.username!,
-        `${process.env.FORGOT_PASSWORD_REDIRECT_URL}/${unHashedToken}`
+        `${env.FORGOT_PASSWORD_REDIRECT_URL}/${unHashedToken}`
       ),
     });
 
@@ -446,14 +451,12 @@ const resetForgottenPassword = asyncHandler(
     const { resetToken } = req.params;
     const { newPassword } = req.body;
 
-    logger.info(`Reset Token: ${resetToken}`);
-
     const hashedToken = crypto
       .createHash("sha256")
       .update(resetToken)
       .digest("hex");
 
-    logger.info(`Hashed Reset Token: ${hashedToken}`);
+    logger.info("Password reset attempt with token");
 
     const user = await db.query.User.findFirst({
       where: and(
@@ -501,7 +504,7 @@ const changeCurrentPassword = asyncHandler(
     const { oldPassword, newPassword } = req.body;
 
     const user = await db.query.User.findFirst({
-      where: eq(User.id, req.user!.userId!),
+      where: eq(User.id, req.user!.id!),
     });
 
     const isPasswordValid = bcrypt.compare(oldPassword, user!.password!);
@@ -602,7 +605,7 @@ const handleSocialLogin = asyncHandler(async (req: Request, res: Response) => {
     .status(301)
     .cookie("accessToken", accessToken, options) // set the access token in the cookie
     .cookie("refreshToken", refreshToken, options) // set the refresh token in the cookie
-    .redirect(process.env.CLIENT_SSO_REDIRECT_URL!);
+    .redirect(env.CLIENT_SSO_REDIRECT_URL);
   // .redirect(
   //   // redirect user to the frontend with access and refresh token in case user is not using cookies
   //   `${process.env.CLIENT_SSO_REDIRECT_URL}?accessToken=${accessToken}&refreshToken=${refreshToken}`

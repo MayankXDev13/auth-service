@@ -1,8 +1,14 @@
 declare global {
   namespace Express {
     interface User {
-      userId?: string;
-      id?: string;
+      id: string;
+      email: string;
+      username: string | null;
+      role: "admin" | "user";
+    }
+    
+    interface Request {
+      user?: User;
     }
   }
 }

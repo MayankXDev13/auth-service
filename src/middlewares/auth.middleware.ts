@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError";
 import { db } from "../config/db";
 import { User } from "../db/schema";
+import { env } from "../config/env";
 import type { Request, Response, NextFunction } from "express";
 import { eq } from "drizzle-orm";
 
@@ -17,16 +18,12 @@ export const verifyJWT = asyncHandler(
     }
 
     try {
-      const secret = process.env.ACCESS_TOKEN_SECRET;
-
-      if (!secret) {
-        throw new ApiError(500, "Server configuration error");
-      }
+      const secret = env.ACCESS_TOKEN_SECRET;
 
       const decodedToken = jwt.verify(token, secret) as jwt.JwtPayload;
 
       const user = await db.query.User.findFirst({
-        where: eq(User.id, decodedToken.userId),
+        where: eq(User.id, decodedToken.userId as string),
         columns: {
           id: true,
           email: true,

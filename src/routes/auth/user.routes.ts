@@ -14,27 +14,36 @@ import {
   handleSocialLogin,
 } from "../../controllers/auth/user.controller";
 import { verifyJWT } from "../../middlewares/auth.middleware";
+import { validate } from "../../middlewares/validate.middleware";
+import {
+  registerSchema,
+  loginSchema,
+  changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  assignRoleSchema,
+} from "../../validators/auth.validator";
 import passport from "passport";
 
 const router = Router();
 
 // Unsecured routes
-router.route("/register").post(registerUser);
-router.route("/login").post(loginUser);
+router.route("/register").post(validate(registerSchema), registerUser);
+router.route("/login").post(validate(loginSchema), loginUser);
 router.route("/refresh-token").post(refreshAccessToken);
 router.route("/verify-email/:verificationToken").get(verifyEmail);
-router.route("/forgot-password").post(forgotPasswordRequest);
-router.route("/reset-password/:resetToken").post(resetForgottenPassword);
+router.route("/forgot-password").post(validate(forgotPasswordSchema), forgotPasswordRequest);
+router.route("/reset-password/:resetToken").post(validate(resetPasswordSchema), resetForgottenPassword);
 
 // Secured routes
 router.route("/logout").post(verifyJWT, logoutUser);
 router.route("/avatar").post(verifyJWT);
-router.route("/change-password").post(verifyJWT, changeCurrentPassword);
+router.route("/change-password").post(verifyJWT, validate(changePasswordSchema), changeCurrentPassword);
 router
   .route("/resend-email-verification")
   .post(verifyJWT, resendEmailVerification);
 
-router.route("/assign-role/:userId").post(verifyJWT, assignRole);
+router.route("/assign-role/:userId").post(verifyJWT, validate(assignRoleSchema), assignRole);
 router.route("/current-user").get(verifyJWT, getCurrentUser);
 
 // SSO routes

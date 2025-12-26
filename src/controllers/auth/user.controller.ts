@@ -406,8 +406,6 @@ const forgotPasswordRequest = asyncHandler(
     const { hashedToken, unHashedToken, tokenExpiry } =
       generateTemporaryToken();
 
-    logger.info("Password reset token generated for user");
-
     await db
       .update(User)
       .set({
@@ -446,7 +444,7 @@ const forgotPasswordRequest = asyncHandler(
   }
 );
 
-const resetForgottenPassword = asyncHandler(
+  const resetForgottenPassword = asyncHandler(
   async (req: Request, res: Response) => {
     const { resetToken } = req.params;
     const { newPassword } = req.body;

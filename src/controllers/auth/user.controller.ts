@@ -134,7 +134,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     .json(
       new ApiResponse(
         201,
-        { user: user },
+        { userId: user.id },
         "Users registered successfully and verification email has been sent on your email."
       )
     );

@@ -2,6 +2,7 @@ import { ApiResponse } from "../utils/ApiResponse";
 import { asyncHandler } from "../utils/asyncHandler";
 import type { Request, Response } from "express";
 import { pool } from "../config/db";
+import logger from "../logger/winston.logger";
 
 
 const healthCheck = asyncHandler(async (req: Request, res: Response) => {
@@ -26,7 +27,7 @@ const healthCheck = asyncHandler(async (req: Request, res: Response) => {
     healthData.database = "disconnected";
     healthData.status = "DEGRADED";
     
-    console.error("Database connection failed:", {
+    logger.error("Database connection failed", {
       error: error instanceof Error ? error.message : "Unknown error",
       databaseUrl: process.env.DATABASE_URL ? "CONFIGURED" : "MISSING"
     });

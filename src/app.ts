@@ -8,6 +8,7 @@ import rateLimit from "express-rate-limit";
 import morganMiddleware from "./logger/morgan.logger";
 import session from "express-session";
 import "./passport/index"; // Passport strategies
+import { initRedis } from "./lib/redis";
 
 const app: Application = express();
 
@@ -34,7 +35,7 @@ app.use(helmet({
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 5 requests per windowMs
+  max: 10, // limit each IP to 10 requests per windowMs
   message: "Too many authentication attempts, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
@@ -78,4 +79,8 @@ app.use("/api/v1/healthcheck", healthCheckRouter);
 app.use("/api/v1/users", authLimiter, userRouter);
 
 app.use(errorHandler);
+
+// Initialize Redis (optional)
+initRedis();
+
 export default app;

@@ -1,57 +1,78 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const registerSchema = z.object({
-  email: z.string().email("Invalid email format"),
-  username: z.string().min(3, "Username must be at least 3 characters").max(50, "Username cannot exceed 50 characters"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters long")
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
-      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"),
+  email: z.string().email('Invalid email format'),
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(50, 'Username cannot exceed 50 characters'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters long')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+    ),
 });
 
-export const loginSchema = z.object({
-  email: z.string().email("Invalid email format").optional(),
-  username: z.string().min(3, "Username must be at least 3 characters").optional(),
-  password: z.string().min(1, "Password is required"),
-}).refine(data => data.email || data.username, {
-  message: "Either email or username is required",
-  path: ["email"]
-});
+export const loginSchema = z
+  .object({
+    email: z.string().email('Invalid email format').optional(),
+    username: z
+      .string()
+      .min(3, 'Username must be at least 3 characters')
+      .optional(),
+    password: z.string().min(1, 'Password is required'),
+  })
+  .refine(data => data.email || data.username, {
+    message: 'Either email or username is required',
+    path: ['email'],
+  });
 
 export const changePasswordSchema = z.object({
-  oldPassword: z.string().min(1, "Old password is required"),
-  newPassword: z.string()
-    .min(8, "Password must be at least 8 characters long")
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
-      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"),
+  oldPassword: z.string().min(1, 'Old password is required'),
+  newPassword: z
+    .string()
+    .min(8, 'Password must be at least 8 characters long')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+    ),
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email("Invalid email format"),
+  email: z.string().email('Invalid email format'),
 });
 
 export const resetPasswordSchema = z.object({
-  newPassword: z.string()
-    .min(8, "Password must be at least 8 characters long")
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
-      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"),
+  newPassword: z
+    .string()
+    .min(8, 'Password must be at least 8 characters long')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+    ),
 });
 
 export const assignRoleSchema = z.object({
-  role: z.enum(["admin", "user"], {
-    message: "Role must be either 'admin' or 'user'"
+  role: z.enum(['admin', 'user'], {
+    message: "Role must be either 'admin' or 'user'",
   }),
 });
 
 export const avatarUrlSchema = z.object({
-  url: z.string().url("Invalid URL format"),
+  url: z.string().url('Invalid URL format'),
 });
 
 export const updateUsernameSchema = z.object({
-  username: z.string()
-    .min(3, "Username must be at least 3 characters")
-    .max(50, "Username cannot exceed 50 characters")
-    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(50, 'Username cannot exceed 50 characters')
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      'Username can only contain letters, numbers, and underscores'
+    ),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

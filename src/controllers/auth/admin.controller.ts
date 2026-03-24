@@ -1,11 +1,11 @@
-import type { Request, Response } from "express";
-import { User } from "../../db/schema";
-import { db } from "../../config/db";
-import { eq } from "drizzle-orm";
-import { ApiError } from "../../utils/ApiError";
-import { ApiResponse } from "../../utils/ApiResponse";
-import { asyncHandler } from "../../utils/asyncHandler";
-import { posthog } from "../../lib/posthog";
+import type { Request, Response } from 'express';
+import { User } from '../../db/schema';
+import { db } from '../../config/db';
+import { eq } from 'drizzle-orm';
+import { ApiError } from '../../utils/ApiError';
+import { ApiResponse } from '../../utils/ApiResponse';
+import { asyncHandler } from '../../utils/asyncHandler';
+import { posthog } from '../../lib/posthog';
 
 /**
  * Assigns a role to a user (admin function)
@@ -22,7 +22,7 @@ const assignRole = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!user) {
-    throw new ApiError(404, "User does not exist");
+    throw new ApiError(404, 'User does not exist');
   }
 
   await db.update(User).set({ role }).where(eq(User.id, user.id));
@@ -32,7 +32,7 @@ const assignRole = asyncHandler(async (req: Request, res: Response) => {
   // RBAC analytics
   posthog.capture({
     distinctId: user.id,
-    event: "user_role_changed",
+    event: 'user_role_changed',
     properties: {
       role,
     },
@@ -40,9 +40,7 @@ const assignRole = asyncHandler(async (req: Request, res: Response) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Role changed for the user"));
+    .json(new ApiResponse(200, {}, 'Role changed for the user'));
 });
 
-export {
-  assignRole,
-};
+export { assignRole };

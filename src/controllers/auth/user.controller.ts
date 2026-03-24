@@ -1,14 +1,14 @@
-import type { Request, Response } from "express";
-import { User } from "../../db/schema";
-import { db } from "../../config/db";
-import { and, eq, ne } from "drizzle-orm";
-import { ApiError } from "../../utils/ApiError";
-import { ApiResponse } from "../../utils/ApiResponse";
-import { asyncHandler } from "../../utils/asyncHandler";
-import logger from "../../logger/winston.logger";
-import { posthog } from "../../lib/posthog";
-import { uploadBuffer, deleteObject } from "../../utils/s3";
-import { getCachedUser, cacheUser, deleteCachedUser } from "../../utils/cache";
+import type { Request, Response } from 'express';
+import { User } from '../../db/schema';
+import { db } from '../../config/db';
+import { and, eq, ne } from 'drizzle-orm';
+import { ApiError } from '../../utils/ApiError';
+import { ApiResponse } from '../../utils/ApiResponse';
+import { asyncHandler } from '../../utils/asyncHandler';
+import logger from '../../logger/winston.logger';
+import { posthog } from '../../lib/posthog';
+import { uploadBuffer, deleteObject } from '../../utils/s3';
+import { getCachedUser, cacheUser, deleteCachedUser } from '../../utils/cache';
 
 /**
  * Gets the current authenticated user's profile
@@ -39,7 +39,7 @@ const getCurrentUser = asyncHandler(async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      throw new ApiError(404, "User not found");
+      throw new ApiError(404, 'User not found');
     }
 
     userData = user;
@@ -47,10 +47,10 @@ const getCurrentUser = asyncHandler(async (req: Request, res: Response) => {
     await cacheUser(userId, userData, 1800);
   }
 
-  logger.info("Current user fetched", { userId });
+  logger.info('Current user fetched', { userId });
   return res
     .status(200)
-    .json(new ApiResponse(200, userData, "Current user fetched successfully"));
+    .json(new ApiResponse(200, userData, 'Current user fetched successfully'));
 });
 
 /**
@@ -69,7 +69,7 @@ const updateUsername = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (existingUser) {
-    throw new ApiError(409, "Username is already taken");
+    throw new ApiError(409, 'Username is already taken');
   }
 
   // Update username
@@ -78,12 +78,12 @@ const updateUsername = asyncHandler(async (req: Request, res: Response) => {
   // PostHog analytics
   posthog.capture({
     distinctId: userId,
-    event: "username_updated",
+    event: 'username_updated',
   });
 
-  return res.status(200).json(
-    new ApiResponse(200, { username }, "Username updated successfully")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { username }, 'Username updated successfully'));
 });
 
 /**
@@ -96,7 +96,7 @@ const uploadProfilePicture = asyncHandler(
   async (req: Request, res: Response) => {
     const file = (req as any).file;
     if (!file) {
-      throw new ApiError(400, "No file uploaded");
+      throw new ApiError(400, 'No file uploaded');
     }
     const { buffer, mimetype, originalname } = file;
     const userId = req.user!.id!;
@@ -117,7 +117,7 @@ const uploadProfilePicture = asyncHandler(
           const oldKey = oldUrl.split('/').slice(3).join('/');
           await deleteObject(oldKey);
         } catch (deleteError) {
-          logger.warn("Failed to delete old avatar", { error: deleteError });
+          logger.warn('Failed to delete old avatar', { error: deleteError });
           // Don't fail the upload if delete fails
         }
       }
@@ -130,7 +130,7 @@ const uploadProfilePicture = asyncHandler(
       // PostHog event
       posthog.capture({
         distinctId: userId,
-        event: "profile_picture_uploaded",
+        event: 'profile_picture_uploaded',
       });
 
       return res
@@ -139,23 +139,19 @@ const uploadProfilePicture = asyncHandler(
           new ApiResponse(
             200,
             { profilePicture: s3Url },
-            "Profile picture uploaded successfully"
+            'Profile picture uploaded successfully'
           )
         );
     } catch (error) {
-      logger.error("Profile picture upload error", {
-        error: error instanceof Error ? error.message : "Unknown error",
+      logger.error('Profile picture upload error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw new ApiError(
         400,
-        error instanceof Error ? error.message : "Upload failed"
+        error instanceof Error ? error.message : 'Upload failed'
       );
     }
   }
 );
 
-export {
-  getCurrentUser,
-  updateUsername,
-  uploadProfilePicture,
-};
+export { getCurrentUser, updateUsername, uploadProfilePicture };

@@ -1,5 +1,9 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { env } from "../config/env";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
+import { env } from '../config/env';
 
 const s3Client = new S3Client({
   region: env.AWS_REGION,
@@ -32,19 +36,23 @@ export const uploadBuffer = async (
   const key = `${env.S3_PROFILE_PICS_PREFIX}${userId}/${sanitizedName}-${Date.now()}.${extension}`;
 
   // Upload to S3
-  await s3Client.send(new PutObjectCommand({
-    Bucket: env.S3_BUCKET,
-    Key: key,
-    Body: buffer,
-    ContentType: contentType,
-  }));
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: env.S3_BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    })
+  );
 
   return `https://${env.S3_BUCKET}.s3.${env.AWS_REGION}.amazonaws.com/${key}`;
 };
 
 export const deleteObject = async (key: string): Promise<void> => {
-  await s3Client.send(new DeleteObjectCommand({
-    Bucket: env.S3_BUCKET,
-    Key: key,
-  }));
+  await s3Client.send(
+    new DeleteObjectCommand({
+      Bucket: env.S3_BUCKET,
+      Key: key,
+    })
+  );
 };

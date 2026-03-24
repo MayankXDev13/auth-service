@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.git
+.github
+README.md
+.env
+.nyc_output
+coverage
+.nyc_output
+.cache
+dist
+*.log

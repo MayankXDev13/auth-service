@@ -1,8 +1,16 @@
 declare global {
   namespace Express {
     interface User {
-      userId?: string;
-      id?: string;
+      id: string;
+      email: string;
+      username: string | null;
+      role: "admin" | "user";
+      profilePicture?: string | null;
+      isEmailVerified?: boolean;
+    }
+
+    interface Request {
+      user?: User;
     }
   }
 }

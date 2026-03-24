@@ -15,6 +15,13 @@
       "when": 1766570984628,
       "tag": "0001_great_unus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1766730175199,
+      "tag": "0002_glossy_the_hunter",
+      "breakpoints": true
     }
   ]
 }

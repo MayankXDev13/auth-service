@@ -2,7 +2,6 @@ import morgan from 'morgan';
 import logger from './winston.logger.js';
 
 const stream = {
-  // Use the http severity
   write: (message: string) => logger.http(message.trim()),
 };
 

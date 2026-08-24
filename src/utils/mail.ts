@@ -2,8 +2,6 @@ import Mailgen from 'mailgen';
 import { Resend } from 'resend';
 import logger from '../logger/winston.logger';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const mailGenerator = new Mailgen({
   theme: 'default',
   product: {
@@ -12,12 +10,14 @@ const mailGenerator = new Mailgen({
   },
 });
 
-if (!process.env.RESEND_API_KEY) {
-  throw new Error('RESEND_API_KEY is not defined in environment variables');
-}
-
-if (!process.env.RESEND_FROM_EMAIL) {
-  throw new Error('RESEND_FROM_EMAIL is not defined in environment variables');
+// Lazily initialized — do not throw at import (fixes startup crash when keys missing, env.ts already validates)
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (_resend) return _resend;
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY is not defined in environment variables');
+  _resend = new Resend(apiKey);
+  return _resend;
 }
 
 const sendEmail = async (options: {
@@ -28,8 +28,11 @@ const sendEmail = async (options: {
   const emailTextual = mailGenerator.generatePlaintext(options.mailgenContent);
   const emailHtml = mailGenerator.generate(options.mailgenContent);
 
+  // Validate required env at call-time, not import-time
+  if (!process.env.RESEND_FROM_EMAIL) throw new Error('RESEND_FROM_EMAIL is not defined in environment variables');
+
   try {
-    const response = await resend.emails.send({
+    const response = await getResend().emails.send({
       from: process.env.RESEND_FROM_EMAIL!,
       to: options.email,
       subject: options.subject,
@@ -68,54 +71,7 @@ const sendEmail = async (options: {
   }
 };
 
-const emailVerificationMailgenContent = (
-  username: string,
-  verificationUrl: string
-) => {
-  return {
-    body: {
-      name: username,
-      intro: "Welcome to our app! We're very excited to have you on board.",
-      action: {
-        instructions:
-          'To verify your email please click on the following button:',
-        button: {
-          color: '#22BC66',
-          text: 'Verify your email',
-          link: verificationUrl,
-        },
-      },
-      outro:
-        "Need help, or have questions? Just reply to this email, we'd love to help.",
-    },
-  };
-};
+// Re-export canonical templates (single source)
+export { emailVerificationMailgenContent, forgotPasswordMailgenContent } from './mailTemplates';
 
-const forgotPasswordMailgenContent = (
-  username: string,
-  passwordResetUrl: string
-) => {
-  return {
-    body: {
-      name: username,
-      intro: 'We got a request to reset the password of our account',
-      action: {
-        instructions:
-          'To reset your password click on the following button or link:',
-        button: {
-          color: '#22BC66', // Optional action button color
-          text: 'Reset password',
-          link: passwordResetUrl,
-        },
-      },
-      outro:
-        "Need help, or have questions? Just reply to this email, we'd love to help.",
-    },
-  };
-};
-
-export {
-  sendEmail,
-  emailVerificationMailgenContent,
-  forgotPasswordMailgenContent,
-};
+export { sendEmail };

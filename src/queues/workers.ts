@@ -1,10 +1,11 @@
-import { Worker } from 'bullmq';
-import logger from '../logger/winston.logger';
+/**
+ * @deprecated — use `src/modules/email/worker` deep module. Retained for `pnpm worker` backward compat.
+ */
+import { startEmailWorker, closeEmailWorker } from '../modules/email/worker';
+import { env } from '../config/env';
 
-export const emailWorker = new Worker('emailQueue', async job => {
-  logger.info(`Email worker started for job ${job.id}`);
-  logger.info(`Processing job ${job.id}`);
+export const emailWorker = process.env.REDIS_URL && env.RESEND_API_KEY
+  ? (startEmailWorker({ resendApiKey: env.RESEND_API_KEY, from: env.RESEND_FROM_EMAIL }) as any)
+  : (null as any);
 
-  //add login read the email Queue and send the email
-  console.log(job.data);
-});
+export const closeWorker = closeEmailWorker;

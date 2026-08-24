@@ -1,34 +1,6 @@
 
-class ApiError extends Error {
-  public statusCode: number;   
-  public success: boolean;     
-  public errors: any[];        
-  public data: null;           
-
-  constructor(
-    statusCode: number,
-    message: string = "Something went wrong",
-    errors: any[] = [],
-    stack?: string
-  ) {
-    super(message);
-
-
-    this.statusCode = statusCode;
-
-
-    this.success = false;
-    this.message = message;
-    this.errors = errors;
-    this.data = null;
-
-
-    if (stack) {
-      this.stack = stack;
-    } else {
-      Error.captureStackTrace(this, this.constructor);
-    }
-  }
-}
-
-export { ApiError };
+/**
+ * @deprecated — shallow util, use `import { ApiError } from 'lib/http'` (deep module).
+ * Previously 34 LoC standalone, imported in 12 files. Now re-export from src/lib/http.
+ */
+export { ApiError } from '../lib/http';

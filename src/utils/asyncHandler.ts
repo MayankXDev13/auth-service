@@ -1,15 +1,5 @@
-import type { Request, Response, NextFunction } from "express";
-
-const asyncHandler =
-  <TReq = Request, TRes = Response>(
-    requestHandler: (
-      req: TReq,
-      res: TRes,
-      next: NextFunction
-    ) => Promise<any>
-  ) =>
-  (req: TReq, res: TRes, next: NextFunction): void => {
-    Promise.resolve(requestHandler(req, res, next)).catch(next);
-  };
-
-export { asyncHandler };
+/**
+ * @deprecated — shallow util, use `import { asyncHandler } from 'lib/http'`.
+ * Previously 15 LoC indirection, imported in 6 controllers. Now re-export from src/lib/http.
+ */
+export { asyncHandler } from '../lib/http';

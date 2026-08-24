@@ -403,7 +403,8 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
     const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessAndRefreshToken(user.id);
 
-    await db.update(User).set({ refreshToken: newRefreshToken });
+    // Fix: previously missing WHERE updated all rows — now scoped to current user (domain fixes centrally)
+    await db.update(User).set({ refreshToken: newRefreshToken }).where(eq(User.id, user.id));
 
     // PostHog "access_token_refreshed"
     // session longevity

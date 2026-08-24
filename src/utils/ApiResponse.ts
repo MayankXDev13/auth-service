@@ -1,18 +1,6 @@
 
-class ApiResponse<T = any> {
-  public statusCode: number;
-  public success: boolean;
-  public message: string;
-  public data: T;
-
-  constructor(statusCode: number, data: T, message: string = "Success") {
-    this.statusCode = statusCode;
-    this.data = data;
-    this.message = message;
-    this.success = statusCode < 400;
-  }
-
-  
-}
-
-export { ApiResponse };
+/**
+ * @deprecated — shallow util, use `import { ApiResponse, successResponse } from 'lib/http'`.
+ * Previously 18 LoC standalone, imported in 6 controllers. Now re-export from src/lib/http.
+ */
+export { ApiResponse, successResponse, createdResponse, noContentResponse } from '../lib/http';

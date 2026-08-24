@@ -1,136 +1,23 @@
+/**
+ * @deprecated — God-router aggregator kept for backward compat (`import userRouter from './routes/auth/user.routes'`).
+ * Previously 116 LoC multiplexing 4 controllers + 7 schemas + 5 sanitize chains + verifyJWT + multer + rateLimit + passport.
+ * Now decomposed into focused modules: `auth.routes.ts` (6 endpoints), `profile.routes.ts` (6), `admin.routes.ts` (1), `oauth.routes.ts` (4).
+ * This file now composes them (thin aggregator, 10 LoC). New code should import focused modules directly via `src/routes/auth/*`.
+ * Also see `src/modules/auth` deep domain for HTTP-adapter-less core (`AuthDomain` + `createAuth().router`).
+ */
 import { Router } from 'express';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import multer from 'multer';
-import {
-  registerUser,
-  loginUser,
-  logoutUser,
-  verifyEmail,
-  resendEmailVerification,
-  refreshAccessToken,
-  handleSocialLogin,
-} from '../../controllers/auth/auth.controller';
-
-import {
-  forgotPasswordRequest,
-  resetForgottenPassword,
-  changeCurrentPassword,
-} from '../../controllers/auth/password.controller';
-
-import {
-  getCurrentUser,
-  updateUsername,
-  uploadProfilePicture,
-} from '../../controllers/auth/user.controller';
-
-import { assignRole } from '../../controllers/auth/admin.controller';
-import { verifyJWT } from '../../middlewares/auth.middleware';
-import { validate } from '../../middlewares/validate.middleware';
-import {
-  sanitizeRegistration,
-  sanitizeLogin,
-  sanitizePasswordChange,
-  sanitizePasswordReset,
-  sanitizeUsernameUpdate,
-} from '../../middlewares/sanitize.middleware';
-import {
-  registerSchema,
-  loginSchema,
-  changePasswordSchema,
-  forgotPasswordSchema,
-  resetPasswordSchema,
-  assignRoleSchema,
-  updateUsernameSchema,
-} from '../../validators/auth.validator';
-import passport from 'passport';
-
-const avatarLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
-  message: 'Too many profile picture upload requests, please try again later.',
-});
-
-const usernameUpdateLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  max: 3, // 3 updates per day
-  message: 'Too many username updates, please try again later.',
-  keyGenerator: req =>
-    (req as any).user?.id || ipKeyGenerator(req.ip as string), // Rate limit per user
-});
-
-const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
+import authRoutes from './auth.routes';
+import profileRoutes from './profile.routes';
+import adminRoutes from './admin.routes';
+import oauthRoutes from './oauth.routes';
 
 const router = Router();
 
-// Unsecured routes
-router.route('/register').post(sanitizeRegistration, validate(registerSchema), registerUser);
-router.route('/login').post(sanitizeLogin, validate(loginSchema), loginUser);
-router.route('/refresh-token').post(refreshAccessToken);
-router.route('/verify-email/:verificationToken').get(verifyEmail);
-router
-  .route('/forgot-password')
-  .post(validate(forgotPasswordSchema), forgotPasswordRequest);
-router
-  .route('/reset-password/:resetToken')
-  .post(sanitizePasswordReset, validate(resetPasswordSchema), resetForgottenPassword);
-
-// Secured routes
-router.route('/logout').post(verifyJWT, logoutUser);
-router
-  .route('/avatar')
-  .post(
-    avatarLimiter,
-    upload.single('avatar'),
-    verifyJWT,
-    uploadProfilePicture
-  );
-router
-  .route('/username')
-  .put(
-    verifyJWT,
-    usernameUpdateLimiter,
-    sanitizeUsernameUpdate,
-    validate(updateUsernameSchema),
-    updateUsername
-  );
-router
-  .route('/change-password')
-  .post(verifyJWT, sanitizePasswordChange, validate(changePasswordSchema), changeCurrentPassword);
-router
-  .route('/resend-email-verification')
-  .post(verifyJWT, resendEmailVerification);
-
-router
-  .route('/assign-role/:userId')
-  .post(verifyJWT, validate(assignRoleSchema), assignRole);
-router.route('/current-user').get(verifyJWT, getCurrentUser);
-
-// SSO routes
-
-router.route('/google').get(
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-  }),
-  (req, res) => {
-    res.send('redirecting to google...');
-  }
-);
-
-router.route('/github').get(
-  passport.authenticate('github', {
-    scope: ['profile', 'email'],
-  }),
-  (req, res) => {
-    res.send('redirecting to github...');
-  }
-);
-
-router
-  .route('/google/callback')
-  .get(passport.authenticate('google'), handleSocialLogin);
-
-router
-  .route('/github/callback')
-  .get(passport.authenticate('github'), handleSocialLogin);
+// Compose focused routers under single `/api/v1/users` mount (preserves path `auth/` vs `users` mismatch for compat)
+// app.ts mounts this aggregator at `/api/v1/users`; decomposed routers could be mounted separately at same base in app wiring refactor.
+router.use(authRoutes);
+router.use(profileRoutes);
+router.use(adminRoutes);
+router.use(oauthRoutes);
 
 export default router;

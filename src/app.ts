@@ -7,9 +7,13 @@ import passport from 'passport';
 import rateLimit from 'express-rate-limit';
 import morganMiddleware from './logger/morgan.logger';
 import session from 'express-session';
-import './passport/index'; // Passport strategies
+import './passport/index'; // Passport strategies — retained for backward compat; new auth domain prefers createAuth().init()
+import healthCheckRouter from './routes/healthcheck.routes';
+import userRouter from './routes/auth/user.routes'; // aggregator of auth/profile/admin/oauth (see routes/auth/*.routes.ts)
+import { errorHandler } from './middlewares/error.middleware';
 
-const app: Application = express();
+export function makeApp(): Application {
+  const app: Application = express();
 
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
@@ -70,17 +74,23 @@ app.use(
   })
 );
 
-app.use(passport.initialize());
-app.use(passport.session());
-app.use(morganMiddleware);
+  app.use(passport.initialize());
+  app.use(passport.session());
+  app.use(morganMiddleware);
 
-import healthCheckRouter from './routes/healthcheck.routes';
-import userRouter from './routes/auth/user.routes';
-import { errorHandler } from './middlewares/error.middleware';
+  app.use('/api/v1/healthcheck', healthCheckRouter);
+  // Single mount via aggregator (preserves /api/v1/users path mismatch `auth/` vs `users` for compat)
+  // Decomposed alternative (explicit wiring, preferred for new code):
+  // import authRoutes from './routes/auth/auth.routes'; import profileRoutes from './routes/auth/profile.routes';
+  // import adminRoutes from './routes/auth/admin.routes'; import oauthRoutes from './routes/auth/oauth.routes';
+  // app.use('/api/v1/users', authLimiter, authRoutes); app.use('/api/v1/users', profileRoutes);
+  // app.use('/api/v1/users', adminRoutes); app.use('/api/v1/users', oauthRoutes);
+  app.use('/api/v1/users', authLimiter, userRouter);
 
-app.use('/api/v1/healthcheck', healthCheckRouter);
-app.use('/api/v1/users', authLimiter, userRouter);
+  app.use(errorHandler);
 
-app.use(errorHandler);
+  return app;
+}
 
+const app = makeApp();
 export default app;

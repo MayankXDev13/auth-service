@@ -1,49 +1,49 @@
-# Multi-stage build for optimization
-FROM node:18-alpine AS builder
+# Stage 1: Dependencies
+
+FROM node:22-alpine AS deps
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-COPY pnpm-lock.yaml ./
-RUN npm install -g pnpm
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml ./
 
-# Copy source code
-COPY . .
+RUN corepack enable \
+    && pnpm install --frozen-lockfile
 
-# Build application
-RUN pnpm build
 
-# Production stage
-FROM node:18-alpine AS production
+
+# Stage 2: Builder
+
+FROM node:22-alpine AS builder
 
 WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json pnpm-lock.yaml ./
+COPY tsconfig*.json ./
+COPY src ./src
+
+RUN corepack enable \
+    && pnpm build
+
+
+# Stage 3: Production
+
+FROM node:22-alpine AS production
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY package.json pnpm-lock.yaml ./
 
 # Install only production dependencies
-COPY package*.json ./
-COPY pnpm-lock.yaml ./
-RUN npm install -g pnpm
-RUN pnpm install --prod --frozen-lockfile
+RUN corepack enable \
+    && pnpm install --prod --frozen-lockfile
 
-# Copy built application
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/drizzle ./drizzle
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+USER node
 
-# Change ownership
-RUN chown -R nodejs:nodejs /app
-USER nodejs
+EXPOSE 3000
 
-# Expose port
-EXPOSE 4000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:4000/api/v1/healthcheck/simple || exit 1
-
-# Start application
-CMD ["node", "dist/server.js"]
+CMD ["pnpm", "start"]
